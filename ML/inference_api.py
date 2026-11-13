@@ -4,6 +4,7 @@ import cv2
 import numpy as np
 import uvicorn
 from pathlib import Path
+from datetime import datetime
 
 app = FastAPI()
 
@@ -65,6 +66,9 @@ if not MODEL_PATH.exists():
     raise RuntimeError(f"ONNX model not found at {MODEL_PATH}. Export waste_model.onnx before starting the API.")
 model = cv2.dnn.readNetFromONNX(str(MODEL_PATH))
 print(f"[ML] ONNX class index mapping: {dict(enumerate(CLASS_NAMES))}", flush=True)
+model_timestamp = datetime.fromtimestamp(MODEL_PATH.stat().st_mtime).astimezone().isoformat()
+print(f"[ML] ONNX model path: {MODEL_PATH.resolve()}", flush=True)
+print(f"[ML] ONNX model last modified: {model_timestamp}", flush=True)
 
 @app.post("/classify")
 async def classify_waste(file: UploadFile = File(...)):
