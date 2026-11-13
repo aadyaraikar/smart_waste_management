@@ -71,12 +71,14 @@ async def classify_waste(file: UploadFile = File(...)):
     img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
     if img is None:
         raise HTTPException(status_code=400, detail="Uploaded file is not a valid image")
+    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    img = cv2.resize(img, (224, 224), interpolation=cv2.INTER_AREA)
     model_input = cv2.dnn.blobFromImage(
         img,
         scalefactor=1.0 / 255.0,
         size=(224, 224),
         mean=(0, 0, 0),
-        swapRB=True,
+        swapRB=False,
         crop=False,
     )
     model.setInput(model_input)
@@ -96,6 +98,7 @@ async def classify_waste(file: UploadFile = File(...)):
     predicted_idx = int(np.argmax(predictions))
     predicted_label = CLASS_NAMES[predicted_idx]
     confidence = float(predictions[predicted_idx])
+    uncertain = confidence < 0.60
 
     # 4. FORMAT & RETURN THE EXACT JSON CONTRACT
     contract_details = WASTE_CONTRACT_INFO[predicted_label]
@@ -103,6 +106,7 @@ async def classify_waste(file: UploadFile = File(...)):
     return {
         "category": predicted_label,
         "confidence": round(confidence, 2),
+        "uncertain": uncertain,
         "recycler_type": contract_details["recycler_type"],
         "disposal_instruction": contract_details["disposal_instruction"]
     }
