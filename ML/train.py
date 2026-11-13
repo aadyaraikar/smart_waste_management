@@ -10,6 +10,7 @@ from pathlib import Path
 import cv2
 import numpy as np
 import tensorflow as tf
+import tf2onnx
 from tensorflow.keras import layers
 from tensorflow.keras.applications import MobileNetV2
 from tensorflow.keras.applications.mobilenet_v2 import preprocess_input
@@ -103,8 +104,6 @@ def build_model() -> tf.keras.Model:
         weights="imagenet",
     )
     base_model.trainable = True
-    for layer in base_model.layers[:-30]:
-        layer.trainable = False
 
     inputs = tf.keras.Input(shape=(*IMAGE_SIZE, 3))
     features = base_model(inputs, training=True)
@@ -113,7 +112,7 @@ def build_model() -> tf.keras.Model:
     outputs = layers.Dense(len(CLASS_NAMES), activation="softmax")(features)
     model = tf.keras.Model(inputs, outputs)
     model.compile(
-        optimizer=tf.keras.optimizers.Adam(learning_rate=1e-4),
+        optimizer=tf.keras.optimizers.Adam(learning_rate=1e-5),
         loss="categorical_crossentropy",
         metrics=["accuracy"],
     )
@@ -140,6 +139,18 @@ def train(dataset: Path, output: Path, epochs: int, batch_size: int) -> None:
     output.parent.mkdir(parents=True, exist_ok=True)
     model.save(output)
     print(f"Saved model to {output}")
+
+    onnx_output = output.with_suffix(".onnx")
+    input_signature = (
+        tf.TensorSpec((None, *IMAGE_SIZE, 3), tf.float32, name="input"),
+    )
+    tf2onnx.convert.from_keras(
+        model,
+        input_signature=input_signature,
+        opset=13,
+        output_path=str(onnx_output),
+    )
+    print(f"Saved ONNX model to {onnx_output}")
 
 
 if __name__ == "__main__":

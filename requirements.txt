@@ -4,3 +4,4 @@ opencv-python==5.0.0.93
 python-multipart==0.0.33
 uvicorn==0.42.0
 tensorflow>=2.15; python_version < "3.14"
+tf2onnx>=1.16; python_version < "3.14"
