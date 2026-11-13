@@ -48,8 +48,15 @@ WASTE_CONTRACT_INFO = {
     }
 }
 
-# Alphabetical list of your 7 folder names (standard order used by Keras/PyTorch ImageFolder)
-CLASS_NAMES = sorted(list(WASTE_CONTRACT_INFO.keys()))
+CLASS_NAMES = [
+    "E_Waste_Batteries",
+    "Glass",
+    "Metal",
+    "Organic_Wet",
+    "Paper_Cardboard",
+    "Plastic",
+    "Textiles_Footwear",
+]
 
 MODEL_PATH = Path(__file__).with_name("waste_model.onnx")
 if not MODEL_PATH.exists():
