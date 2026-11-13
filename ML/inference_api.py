@@ -82,13 +82,13 @@ async def classify_waste(file: UploadFile = File(...)):
         crop=False,
     )
     model.setInput(model_input)
-    raw_predictions = model.forward().reshape(-1).astype(np.float32)
-    print(f"[ML] Raw prediction array: {raw_predictions.tolist()}", flush=True)
-    if raw_predictions.size != len(CLASS_NAMES):
+    preds = model.forward()[0].astype(np.float32)
+    print(f"[ML] Raw preds from net.forward()[0]: {preds.tolist()}", flush=True)
+    if preds.size != len(CLASS_NAMES):
         raise RuntimeError(
-            f"ONNX model returned {raw_predictions.size} scores; expected {len(CLASS_NAMES)}."
+            f"ONNX model returned {preds.size} scores; expected {len(CLASS_NAMES)}."
         )
-    predictions = raw_predictions.copy()
+    predictions = preds.copy()
     if np.any(predictions < 0) or not np.isclose(float(predictions.sum()), 1.0, atol=1e-3):
         predictions = np.exp(predictions - np.max(predictions))
         predictions /= predictions.sum()
