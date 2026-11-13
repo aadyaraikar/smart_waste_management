@@ -2,6 +2,7 @@ from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 import cv2
 import numpy as np
+import onnxruntime as ort
 import uvicorn
 from pathlib import Path
 from datetime import datetime
@@ -64,11 +65,19 @@ if len(CLASS_NAMES) != 7 or len(set(CLASS_NAMES)) != len(CLASS_NAMES):
 MODEL_PATH = Path(__file__).with_name("waste_model.onnx")
 if not MODEL_PATH.exists():
     raise RuntimeError(f"ONNX model not found at {MODEL_PATH}. Export waste_model.onnx before starting the API.")
-model = cv2.dnn.readNetFromONNX(str(MODEL_PATH))
+session = ort.InferenceSession(
+    str(MODEL_PATH),
+    providers=["CPUExecutionProvider"],
+)
+model_input = session.get_inputs()[0]
+input_name = model_input.name
+input_shape = model_input.shape
 print(f"[ML] ONNX class index mapping: {dict(enumerate(CLASS_NAMES))}", flush=True)
 model_timestamp = datetime.fromtimestamp(MODEL_PATH.stat().st_mtime).astimezone().isoformat()
 print(f"[ML] ONNX model path: {MODEL_PATH.resolve()}", flush=True)
 print(f"[ML] ONNX model last modified: {model_timestamp}", flush=True)
+print(f"[ML] ONNX Runtime input name: {input_name}", flush=True)
+print(f"[ML] ONNX Runtime input shape: {input_shape}", flush=True)
 
 @app.post("/classify")
 async def classify_waste(file: UploadFile = File(...)):
@@ -80,17 +89,12 @@ async def classify_waste(file: UploadFile = File(...)):
         raise HTTPException(status_code=400, detail="Uploaded file is not a valid image")
     img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
     img = cv2.resize(img, (224, 224), interpolation=cv2.INTER_AREA)
-    model_input = cv2.dnn.blobFromImage(
-        img,
-        scalefactor=1.0 / 127.5,
-        size=(224, 224),
-        mean=(127.5, 127.5, 127.5),
-        swapRB=False,
-        crop=False,
+    processed_image = np.expand_dims(
+        img.astype(np.float32) / 127.5 - 1.0,
+        axis=0,
     )
-    model.setInput(model_input)
-    preds = model.forward()[0].astype(np.float32)
-    print(f"[ML] Raw preds from net.forward()[0]: {preds.tolist()}", flush=True)
+    preds = np.asarray(session.run(None, {input_name: processed_image})[0]).reshape(-1).astype(np.float32)
+    print(f"[ML] Raw preds from ONNX Runtime: {preds.tolist()}", flush=True)
     if preds.size != len(CLASS_NAMES):
         raise RuntimeError(
             f"ONNX model returned {preds.size} scores; expected {len(CLASS_NAMES)}."
