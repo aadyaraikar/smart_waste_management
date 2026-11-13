@@ -73,21 +73,26 @@ async def classify_waste(file: UploadFile = File(...)):
         raise HTTPException(status_code=400, detail="Uploaded file is not a valid image")
     model_input = cv2.dnn.blobFromImage(
         img,
-        scalefactor=1 / 255.0,
+        scalefactor=1.0 / 255.0,
         size=(224, 224),
         mean=(0, 0, 0),
         swapRB=True,
         crop=False,
     )
     model.setInput(model_input)
-    predictions = model.forward().reshape(-1).astype(np.float32)
-    if predictions.size != len(CLASS_NAMES):
+    raw_predictions = model.forward().reshape(-1).astype(np.float32)
+    print(f"[ML] Raw prediction array: {raw_predictions.tolist()}", flush=True)
+    if raw_predictions.size != len(CLASS_NAMES):
         raise RuntimeError(
-            f"ONNX model returned {predictions.size} scores; expected {len(CLASS_NAMES)}."
+            f"ONNX model returned {raw_predictions.size} scores; expected {len(CLASS_NAMES)}."
         )
+    predictions = raw_predictions.copy()
     if np.any(predictions < 0) or not np.isclose(float(predictions.sum()), 1.0, atol=1e-3):
         predictions = np.exp(predictions - np.max(predictions))
         predictions /= predictions.sum()
+    print("[ML] Class probabilities:", flush=True)
+    for class_name, probability in zip(CLASS_NAMES, predictions):
+        print(f"  {class_name}: {float(probability):.6f}", flush=True)
     predicted_idx = int(np.argmax(predictions))
     predicted_label = CLASS_NAMES[predicted_idx]
     confidence = float(predictions[predicted_idx])
