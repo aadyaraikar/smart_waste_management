@@ -2,7 +2,6 @@ from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 import cv2
 import numpy as np
-import tensorflow as tf
 import uvicorn
 from pathlib import Path
 
@@ -52,10 +51,10 @@ WASTE_CONTRACT_INFO = {
 # Alphabetical list of your 7 folder names (standard order used by Keras/PyTorch ImageFolder)
 CLASS_NAMES = sorted(list(WASTE_CONTRACT_INFO.keys()))
 
-MODEL_PATH = Path(__file__).with_name("waste_model.h5")
+MODEL_PATH = Path(__file__).with_name("waste_model.onnx")
 if not MODEL_PATH.exists():
-    raise RuntimeError(f"Trained model not found at {MODEL_PATH}. Run ML/train.py first.")
-model = tf.keras.models.load_model(MODEL_PATH)
+    raise RuntimeError(f"ONNX model not found at {MODEL_PATH}. Export waste_model.onnx before starting the API.")
+model = cv2.dnn.readNetFromONNX(str(MODEL_PATH))
 
 @app.post("/classify")
 async def classify_waste(file: UploadFile = File(...)):
@@ -65,14 +64,23 @@ async def classify_waste(file: UploadFile = File(...)):
     img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
     if img is None:
         raise HTTPException(status_code=400, detail="Uploaded file is not a valid image")
-    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-    img_resized = cv2.resize(img, (224, 224))
-    
-    # MobileNetV2 expects RGB pixels scaled to [-1, 1].
-    model_input = tf.keras.applications.mobilenet_v2.preprocess_input(
-        np.expand_dims(img_resized.astype(np.float32), axis=0)
+    model_input = cv2.dnn.blobFromImage(
+        img,
+        scalefactor=1 / 255.0,
+        size=(224, 224),
+        mean=(0, 0, 0),
+        swapRB=True,
+        crop=False,
     )
-    predictions = model.predict(model_input, verbose=0)[0]
+    model.setInput(model_input)
+    predictions = model.forward().reshape(-1).astype(np.float32)
+    if predictions.size != len(CLASS_NAMES):
+        raise RuntimeError(
+            f"ONNX model returned {predictions.size} scores; expected {len(CLASS_NAMES)}."
+        )
+    if np.any(predictions < 0) or not np.isclose(float(predictions.sum()), 1.0, atol=1e-3):
+        predictions = np.exp(predictions - np.max(predictions))
+        predictions /= predictions.sum()
     predicted_idx = int(np.argmax(predictions))
     predicted_label = CLASS_NAMES[predicted_idx]
     confidence = float(predictions[predicted_idx])
