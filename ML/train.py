@@ -44,7 +44,9 @@ class Cv2ImageSequence(tf.keras.utils.Sequence):
             [
                 layers.RandomFlip("horizontal"),
                 layers.RandomRotation(0.05),
-                layers.RandomZoom(0.1),
+                layers.RandomBrightness(0.2),
+                layers.RandomContrast(0.2),
+                layers.RandomZoom(0.25),
             ]
         )
 
@@ -97,6 +99,26 @@ def collect_samples(dataset_directory: Path) -> tuple[list[tuple[Path, int]], li
     return training, validation
 
 
+def calculate_class_weights(dataset_directory: Path) -> dict[int, float]:
+    class_counts = {}
+    for label, class_name in enumerate(CLASS_NAMES):
+        class_directory = dataset_directory / class_name
+        count = sum(
+            1
+            for path in class_directory.iterdir()
+            if path.is_file() and path.suffix.lower() in IMAGE_EXTENSIONS
+        )
+        if count == 0:
+            raise ValueError(f"Class {class_name} has no training images.")
+        class_counts[label] = count
+
+    total_images = sum(class_counts.values())
+    return {
+        label: total_images / (len(CLASS_NAMES) * count)
+        for label, count in class_counts.items()
+    }
+
+
 def build_model() -> tf.keras.Model:
     base_model = MobileNetV2(
         input_shape=(*IMAGE_SIZE, 3),
@@ -132,10 +154,16 @@ def parse_args() -> argparse.Namespace:
 def train(dataset: Path, output: Path, epochs: int, batch_size: int) -> None:
     tf.random.set_seed(RANDOM_SEED)
     training_samples, validation_samples = collect_samples(dataset)
+    class_weights = calculate_class_weights(dataset)
     training = Cv2ImageSequence(training_samples, batch_size, augment=True)
     validation = Cv2ImageSequence(validation_samples, batch_size)
     model = build_model()
-    model.fit(training, validation_data=validation, epochs=epochs)
+    model.fit(
+        training,
+        validation_data=validation,
+        epochs=epochs,
+        class_weight=class_weights,
+    )
     output.parent.mkdir(parents=True, exist_ok=True)
     model.save(output)
     print(f"Saved model to {output}")
