@@ -3,3 +3,4 @@ numpy==2.4.1
 opencv-python==5.0.0.93
 python-multipart==0.0.33
 uvicorn==0.42.0
+tensorflow>=2.15; python_version < "3.14"
