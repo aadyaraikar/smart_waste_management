@@ -57,11 +57,14 @@ CLASS_NAMES = [
     "Plastic",
     "Textiles_Footwear",
 ]
+if len(CLASS_NAMES) != 7 or len(set(CLASS_NAMES)) != len(CLASS_NAMES):
+    raise RuntimeError("CLASS_NAMES must contain seven unique training classes.")
 
 MODEL_PATH = Path(__file__).with_name("waste_model.onnx")
 if not MODEL_PATH.exists():
     raise RuntimeError(f"ONNX model not found at {MODEL_PATH}. Export waste_model.onnx before starting the API.")
 model = cv2.dnn.readNetFromONNX(str(MODEL_PATH))
+print(f"[ML] ONNX class index mapping: {dict(enumerate(CLASS_NAMES))}", flush=True)
 
 @app.post("/classify")
 async def classify_waste(file: UploadFile = File(...)):
@@ -75,9 +78,9 @@ async def classify_waste(file: UploadFile = File(...)):
     img = cv2.resize(img, (224, 224), interpolation=cv2.INTER_AREA)
     model_input = cv2.dnn.blobFromImage(
         img,
-        scalefactor=1.0 / 255.0,
+        scalefactor=1.0 / 127.5,
         size=(224, 224),
-        mean=(0, 0, 0),
+        mean=(127.5, 127.5, 127.5),
         swapRB=False,
         crop=False,
     )
