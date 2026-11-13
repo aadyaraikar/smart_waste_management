@@ -102,16 +102,18 @@ def build_model() -> tf.keras.Model:
         include_top=False,
         weights="imagenet",
     )
-    base_model.trainable = False
+    base_model.trainable = True
+    for layer in base_model.layers[:-30]:
+        layer.trainable = False
 
     inputs = tf.keras.Input(shape=(*IMAGE_SIZE, 3))
-    features = base_model(inputs, training=False)
+    features = base_model(inputs, training=True)
     features = layers.GlobalAveragePooling2D()(features)
-    features = layers.Dropout(0.2)(features)
+    features = layers.Dropout(0.3)(features)
     outputs = layers.Dense(len(CLASS_NAMES), activation="softmax")(features)
     model = tf.keras.Model(inputs, outputs)
     model.compile(
-        optimizer=tf.keras.optimizers.Adam(learning_rate=1e-3),
+        optimizer=tf.keras.optimizers.Adam(learning_rate=1e-4),
         loss="categorical_crossentropy",
         metrics=["accuracy"],
     )
