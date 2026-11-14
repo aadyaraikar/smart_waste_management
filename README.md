@@ -40,7 +40,35 @@ The application follows a decoupled three-tier architecture:
 - Expo Go app installed on your physical Android/iOS device (connected to the same local network/hotspot)
 
 ### 1. Start the FastAPI ML Service (Port `8000`)
-```bash
+
 cd ml-service
 pip install -r requirements.txt
 uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+
+
+2. Start the Express Backend (Port 5000)
+Bash
+
+
+cd backend
+npm install
+node server.js
+3. Configure & Run the Expo Mobile App
+Update API_BASE_URL in constants/api.js with your host machine's local IP address (e.g., http://10.231.201.218:5000), then launch Expo:
+
+Bash
+
+
+cd frontend
+npm install
+npx expo start -c
+Scan the QR code in your terminal using Expo Go on your phone.
+
+📱 User Flow
+Scan: Capture or upload an image of a waste item (e.g., batteries, plastic bottles, or tin cans) and tap Classify Waste Item.
+
+Result: View the detected waste category, confidence score, recommended recycler, and proper disposal action.
+
+Find & Pickup: Choose your pickup location (Home, Office, or Other), view nearby Madgaon recycling hubs on the map, and tap Confirm Pickup Request.
+
+Impact: Watch your daily scan progress ring, streak counter, and total eco-points update dynamically.
